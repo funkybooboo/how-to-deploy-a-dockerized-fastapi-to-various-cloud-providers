@@ -20,11 +20,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Fail early if secret missing (fork safety)
       - name: Check GCP_SA_KEY secret
         run: |
           if [ -z "${GCP_SA_KEY}" ]; then
@@ -34,53 +32,25 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
 
-      # 3. Authenticate to GCP
       - name: Google Cloud Auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
           project_id: ${{ env.PROJECT_ID }}
 
-      # 4. Setup gcloud CLI
-      - name: Setup gcloud SDK
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      # 5. Ensure required APIs are enabled
-      - name: Enable required APIs
-        run: |
-          gcloud services enable run.googleapis.com \
-            artifactregistry.googleapis.com \
-            cloudbuild.googleapis.com \
-            --project=${PROJECT_ID}
-
-      # 6. Configure Docker for Artifact Registry
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
-      # 7. Ensure Artifact Registry repository exists
-      - name: Ensure Artifact Registry repo exists
-        run: |
-          if ! gcloud artifacts repositories list \
-            --location=us-central1 --project=${PROJECT_ID} | grep -q "^${REPO_NAME} "; then
-            echo "Creating Artifact Registry repository '${REPO_NAME}'..."
-            gcloud artifacts repositories create ${REPO_NAME} \
-              --repository-format=docker \
-              --location=us-central1 \
-              --description="Docker repository for FastAPI images" \
-              --project=${PROJECT_ID}
-          else
-            echo "Artifact Registry repository '${REPO_NAME}' exists."
-          fi
-
-      # 8. Build and push Docker image
       - name: Build and Push Docker Image
         run: |
           docker build --progress=plain -t ${{ env.DOCKER_IMAGE_URL }}:latest -f Dockerfile.prod .
           docker push ${{ env.DOCKER_IMAGE_URL }}:latest
 
-      # 9. Deploy to Cloud Run
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
