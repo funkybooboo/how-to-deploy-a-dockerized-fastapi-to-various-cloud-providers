@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from . import smokeTest
+from . import smokeTest  # <- relative import
 
 import debugpy
 
@@ -9,9 +9,7 @@ debugpy.listen(("0.0.0.0", 5678))
 
 app = FastAPI()
 
-origins = [
-    "*"
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,13 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
 app.include_router(smokeTest.router, prefix="/smoke-test")
 
-# Define the API endpoints
-@app.get('/')
+@app.get("/")
 def health():
-    return {
-        "message": "OK 🚀"
-    }
+    return {"message": "OK 🚀"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)
