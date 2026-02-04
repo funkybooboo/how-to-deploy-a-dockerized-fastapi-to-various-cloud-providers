@@ -1,4 +1,5 @@
 """Hello world API endpoints."""
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -7,6 +8,7 @@ router = APIRouter()
 
 class HelloResponse(BaseModel):
     """Response model for hello endpoint."""
+
     message: str
 
 

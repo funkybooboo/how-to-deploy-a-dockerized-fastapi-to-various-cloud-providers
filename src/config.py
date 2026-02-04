@@ -4,6 +4,7 @@ Application configuration management.
 Loads configuration from environment variables with sensible defaults.
 This module provides centralized configuration management for the FastAPI application.
 """
+
 import os
 from functools import lru_cache
 

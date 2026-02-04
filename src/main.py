@@ -4,6 +4,7 @@ FastAPI application entry point.
 This module initializes the FastAPI application with proper configuration,
 middleware, and routing.
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,6 +18,7 @@ settings = get_settings()
 # SECURITY: Only enable debugpy when DEBUG environment variable is true
 if settings.DEBUG:
     import debugpy
+
     debugpy.listen(("0.0.0.0", 5678))
     print(f"🐛 Debugger listening on port 5678 (DEBUG={settings.DEBUG})")
 
@@ -61,6 +63,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         app,
         host=settings.HOST,
