@@ -1,626 +1,334 @@
 # Docker Guide
 
-Comprehensive guide to the Docker containerization setup for this FastAPI application.
+Comprehensive guide to Docker containerization for this FastAPI application.
 
 ## Overview
 
-This project includes two Docker configurations:
-- **Dockerfile.dev** - Development container with tools and live reload
-- **Dockerfile.prod** - Production container optimized for deployment
+Two Docker configurations for different purposes:
+- **Dockerfile.dev** - Development with tools and live reload (~606MB)
+- **Dockerfile.prod** - Production optimized multi-stage build (~196MB)
 
 ## Dockerfile.dev - Development Container
 
-### Purpose
-Development environment with:
-- Development tools (git, vim, build-essential)
-- Live code reload with volume mounts
-- Debug capabilities
-- Larger image size (~606MB) for convenience
+### Complete File
 
-### Complete Dockerfile
 ```dockerfile
-# Use official Python slim image
 FROM python:3.12-slim
 
-# Install essential tools for development
+# Development tools
 RUN apt-get update && apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
-    gnupg \
-    curl \
-    git \
-    vim \
-    net-tools \
-    build-essential
+    curl git vim net-tools build-essential
 
-# Set working directory
 WORKDIR /code
-
-# Set PYTHONPATH so imports work
 ENV PYTHONPATH=/code/src
 
-# Install dependencies
+# Dependencies (cached layer)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# Source code
 COPY ./src ./src
 
-# Expose default dev port
 EXPOSE 8080
-
-# Start server with auto-reload for development
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
 ```
 
-### Layer-by-Layer Explanation
+### Key Concepts
 
-**1. Base Image**
-```dockerfile
-FROM python:3.12-slim
-```
-- Official Python image
-- `slim` variant: minimal size, no unnecessary packages
-- Python 3.12: modern, performant
+**Layer Caching**: Dependencies copied before code
+- Code changes → don't rebuild dependencies
+- Faster builds during development
 
-**2. Development Tools**
-```dockerfile
-RUN apt-get update && apt-get install -y \
-    apt-transport-https \  # HTTPS support
-    ca-certificates \      # SSL certificates
-    gnupg \                # GPG for package verification
-    curl \                 # Download files
-    git \                  # Version control
-    vim \                  # Text editor
-    net-tools \            # Network debugging
-    build-essential        # C compiler for some Python packages
-```
-
-**3. Working Directory**
-```dockerfile
-WORKDIR /code
-```
-- All subsequent commands run from `/code`
-- Code lives in `/code/src`
-
-**4. PYTHONPATH**
-```dockerfile
-ENV PYTHONPATH=/code/src
-```
-- Allows imports like `from src.main import app`
+**PYTHONPATH**: Set to `/code/src` for imports
+- Allows `from src.main import app`
 - Critical for module resolution
 
-**5. Dependencies**
-```dockerfile
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-```
-- Copy requirements first (Docker layer caching)
-- Install before copying code
-- If code changes, don't reinstall dependencies
-
-**6. Source Code**
-```dockerfile
-COPY ./src ./src
-```
-- Copies at build time
-- Overridden by volume mount in docker-compose
-
-**7. Port Exposure**
-```dockerfile
-EXPOSE 8080
-```
-- Documents which port the app uses
-- Doesn't actually publish the port (use `-p` flag)
-
-**8. Start Command**
-```dockerfile
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
-```
-- `--host 0.0.0.0`: Listen on all interfaces (required in container)
-- `--port 8080`: Application port
-- `--reload`: Auto-reload on file changes
+**--reload Flag**: Uvicorn watches for changes
+- Edit code → server auto-restarts
+- Works with volume mounts
 
 ### Usage
 
-**Build**:
 ```bash
+# Build
 docker build -f Dockerfile.dev -t fastapi-dev .
-```
 
-**Run with volume mount** (recommended):
-```bash
-docker run -d \
-  -p 8080:8080 \
+# Run with volume mount
+docker run -p 8080:8080 \
   -v $(pwd)/src:/code/src \
-  -e DEBUG=true \
-  --name fastapi-dev \
   fastapi-dev
 ```
 
-**Run with Docker Compose** (best):
-```bash
-docker-compose -f docker-compose.dev.yaml up
-```
+**Better**: Use docker-compose.dev.yaml instead
 
 ## Dockerfile.prod - Production Container
 
-### Purpose
-Production-optimized container:
-- Minimal size (~164MB)
-- No development tools
-- Immutable (code baked in)
-- Security hardened
-- Fast startup
+### Complete File
 
-### Complete Dockerfile
 ```dockerfile
-FROM python:3.12-slim
+# Stage 1: Build
+FROM python:3.12-slim as builder
 
-ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy only installed packages
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app
 
+# Copy application code
 COPY ./src ./src
 
+# Non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8080
-
-# Run as module to preserve relative imports
-CMD ["python", "-m", "src.main"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
 ```
 
-### Layer-by-Layer Explanation
+### Multi-Stage Build Benefits
 
-**1. Base Image**
-```dockerfile
-FROM python:3.12-slim
-```
-- Same base as dev (consistency)
-- Slim = minimal production footprint
+**Stage 1 (builder)**:
+- Installs dependencies with pip
+- Can include build tools if needed
+- Gets thrown away after build
 
-**2. Unbuffered Output**
-```dockerfile
-ENV PYTHONUNBUFFERED=1
-```
-- Forces stdout/stderr to be unbuffered
-- Logs appear immediately (critical for cloud platforms)
-- Without this, logs may be delayed or lost
+**Stage 2 (runtime)**:
+- Only copies installed packages
+- No pip, no build tools
+- Much smaller final image (196MB vs 606MB)
 
-**3. Working Directory**
-```dockerfile
-WORKDIR /app
-```
-- Different from dev (`/app` vs `/code`)
-- Cleaner production path
+**Why it matters**:
+- Faster deployments (smaller upload)
+- Reduced attack surface (fewer packages)
+- Lower cloud costs (less storage, faster scaling)
 
-**4. Dependencies**
-```dockerfile
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-```
-- Same pattern as dev
-- `--no-cache-dir`: Saves space (no pip cache)
+### Production Features
 
-**5. Source Code**
-```dockerfile
-COPY ./src ./src
-```
-- Code is immutable (baked into image)
-- No volume mounts in production
-
-**6. Port Exposure**
-```dockerfile
-EXPOSE 8080
-```
-- Documents port usage
-
-**7. Start Command**
-```dockerfile
-CMD ["python", "-m", "src.main"]
-```
-- Runs as Python module
-- No `--reload` flag (production)
-- Handles Python path correctly
+**No --reload**: Stable production server
+**Non-root user**: Security best practice
+**No dev tools**: Minimal attack surface
+**Optimized**: Only what's needed to run
 
 ### Usage
 
-**Build**:
 ```bash
+# Build
 docker build -f Dockerfile.prod -t fastapi-prod .
-```
 
-**Run**:
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e DEBUG=false \
+# Run
+docker run -p 8080:8080 \
   -e ENVIRONMENT=production \
-  --name fastapi-prod \
+  -e DEBUG=false \
   fastapi-prod
 ```
 
-**Run with Docker Compose**:
-```bash
-docker-compose up
-```
+## Docker Compose
 
-## Docker Compose Files
-
-### docker-compose.dev.yaml
-
-**Purpose**: Simplify development workflow with volume mounts
+### Development (docker-compose.dev.yaml)
 
 ```yaml
-version: '3.8'
-
 services:
   fastapi-dev:
     build:
-      context: .
       dockerfile: Dockerfile.dev
     ports:
       - "8080:8080"
     volumes:
-      # Live code editing
-      - ./src:/code/src
-      - ./requirements.txt:/code/requirements.txt
+      - ./src:/code/src  # Live code editing
     environment:
       - DEBUG=true
       - ENVIRONMENT=development
-      - CORS_ORIGINS=*
-      - LOG_LEVEL=DEBUG
     restart: unless-stopped
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-**Key Features**:
-- **volumes**: Mount local code into container
-- **environment**: Development settings
-- **restart**: Auto-restart on failure
-- **command**: Override Dockerfile CMD if needed
+**Start**: `docker-compose -f docker-compose.dev.yaml up`
 
-### docker-compose.yaml
-
-**Purpose**: Production-like local environment
+### Production (docker-compose.yaml)
 
 ```yaml
-version: '3.8'
-
 services:
   fastapi-prod:
     build:
-      context: .
       dockerfile: Dockerfile.prod
     ports:
       - "8080:8080"
     environment:
       - DEBUG=false
       - ENVIRONMENT=production
-      - CORS_ORIGINS=https://example.com
-      - LOG_LEVEL=INFO
     restart: unless-stopped
 ```
 
-**Key Features**:
-- No volume mounts (immutable)
-- Production environment variables
-- Minimal configuration
+**Start**: `docker-compose up`
 
-## Volume Mounts Explained
+## Volume Mounts
 
-### What is a Volume Mount?
+### How They Work
 
 ```yaml
 volumes:
   - ./src:/code/src
+    ↑         ↑
+    Host      Container
 ```
 
-- **Left** (`./src`): Path on your computer
-- **Right** (`/code/src`): Path inside container
-- Changes on either side reflect immediately
-- Like a "window" from container to your filesystem
-
-### How It Works
+Changes on either side appear on both sides immediately.
 
 ```
-Your Computer                 Docker Container
-┌─────────────┐              ┌─────────────┐
-│  ./src/     │◄────────────►│  /code/src/ │
-│    main.py  │   mounted    │    main.py  │
-│    api/     │              │    api/     │
-└─────────────┘              └─────────────┘
-
-Edit main.py locally ──► Changes appear in container ──► Uvicorn reloads
+Edit locally → File updates in container → Uvicorn reloads → Changes live
 ```
 
-### Types of Mounts
+### When to Use
 
-**Bind Mount** (what we use):
-```yaml
-volumes:
-  - ./src:/code/src  # Specific directory
-```
+**Use volumes for**:
+- Source code during development
+- Configuration files you edit frequently
+- Logs you want to access easily
 
-**Named Volume**:
-```yaml
-volumes:
-  - app-data:/app/data  # Managed by Docker
-```
-
-## Docker Commands Cheat Sheet
-
-### Building
-
-```bash
-# Build dev container
-docker build -f Dockerfile.dev -t fastapi-dev .
-
-# Build prod container
-docker build -f Dockerfile.prod -t fastapi-prod .
-
-# Build with no cache (fresh build)
-docker build --no-cache -f Dockerfile.dev -t fastapi-dev .
-
-# Build with Docker Compose
-docker-compose -f docker-compose.dev.yaml build
-```
-
-### Running
-
-```bash
-# Run dev container with volume mount
-docker run -d -p 8080:8080 -v $(pwd)/src:/code/src fastapi-dev
-
-# Run prod container
-docker run -d -p 8080:8080 -e ENVIRONMENT=production fastapi-prod
-
-# Run with Docker Compose
-docker-compose -f docker-compose.dev.yaml up
-docker-compose -f docker-compose.dev.yaml up -d  # Detached
-
-# Run and rebuild
-docker-compose -f docker-compose.dev.yaml up --build
-```
-
-### Managing
-
-```bash
-# List running containers
-docker ps
-
-# List all containers
-docker ps -a
-
-# View logs
-docker logs fastapi-dev
-docker logs -f fastapi-dev  # Follow logs
-docker-compose -f docker-compose.dev.yaml logs -f
-
-# Stop container
-docker stop fastapi-dev
-docker-compose -f docker-compose.dev.yaml stop
-
-# Start stopped container
-docker start fastapi-dev
-
-# Remove container
-docker rm fastapi-dev
-
-# Stop and remove
-docker stop fastapi-dev && docker rm fastapi-dev
-docker-compose -f docker-compose.dev.yaml down
-```
-
-### Inspecting
-
-```bash
-# Execute command in running container
-docker exec -it fastapi-dev bash
-docker exec fastapi-dev ps aux
-docker exec fastapi-dev ls -la /code/src
-
-# Inspect container
-docker inspect fastapi-dev
-
-# View container stats
-docker stats fastapi-dev
-
-# View image details
-docker images
-docker image inspect fastapi-dev
-```
-
-### Cleaning Up
-
-```bash
-# Remove unused containers
-docker container prune
-
-# Remove unused images
-docker image prune
-
-# Remove unused volumes
-docker volume prune
-
-# Nuclear option (remove everything)
-docker system prune -a
-```
+**Don't use volumes for**:
+- Production deployments (immutable images)
+- Dependencies (slow, use layer caching)
+- Temporary files (use tmpfs instead)
 
 ## Best Practices
 
-### Development Container
+### Development
 
-✅ **Do**:
-- Use volume mounts for live editing
-- Include development tools
-- Enable auto-reload
-- Use larger base images for convenience
+- **Use docker-compose.dev.yaml** - Simpler than manual commands
+- **Mount only src/** - Not the entire project
+- **Layer dependencies first** - Cache pip installs
+- **Use --reload** - Auto-restart on changes
 
-❌ **Don't**:
-- Use in production
-- Worry about image size
-- Disable auto-reload
+### Production
 
-### Production Container
-
-✅ **Do**:
-- Minimize image size
-- Remove development tools
-- Use multi-stage builds (if needed)
-- Set PYTHONUNBUFFERED=1
-- Use specific image versions
-
-❌ **Don't**:
-- Include development dependencies
-- Use volume mounts
-- Run as root (add USER directive if needed)
-- Include secrets in image
+- **Multi-stage builds** - Smaller images
+- **Non-root user** - Security
+- **No dev dependencies** - requirements.txt only
+- **Explicit versions** - Pin Python, packages
+- **Health checks** - Monitor container status
+- **.dockerignore** - Exclude unnecessary files
 
 ### General
 
-✅ **Do**:
-- Use .dockerignore to exclude files
-- Leverage layer caching (COPY requirements first)
-- Use slim base images
-- Document exposed ports
-- Tag images meaningfully
+- **One process per container** - Not multiple services
+- **Immutable infrastructure** - Rebuild don't patch
+- **Environment variables** - Not hardcoded config
+- **Log to stdout** - Docker captures logs
 
-❌ **Don't**:
-- Store secrets in images
-- Use latest tag in production
-- Run unnecessary services
-- Ignore security updates
+## Multi-Stage Builds Deep Dive
 
-## Multi-Stage Builds (Advanced)
-
-If you need to compile dependencies but want a small final image:
+### Pattern
 
 ```dockerfile
-# Stage 1: Build stage
-FROM python:3.12 as builder
+# Stage 1: Build environment
+FROM base AS builder
+# Install build tools
+# Compile/build application
 
-WORKDIR /build
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-# Stage 2: Runtime stage
-FROM python:3.12-slim
-
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
-
-WORKDIR /app
-COPY ./src ./src
-
-EXPOSE 8080
-CMD ["python", "-m", "src.main"]
+# Stage 2: Runtime environment
+FROM base
+# Copy only artifacts from builder
+# No build tools in final image
 ```
 
-Benefits:
-- Smaller final image
-- Build tools not in production
-- Faster deployments
+### Benefits
 
-## Security Considerations
+| Aspect | Single-Stage | Multi-Stage |
+|--------|--------------|-------------|
+| Image size | ~600MB | ~200MB |
+| Build tools | Included | Excluded |
+| Security | Lower | Higher |
+| Deploy speed | Slower | Faster |
 
-### Running as Non-Root
+### When to Use
 
-Add to Dockerfile:
+**Multi-stage for**:
+- Production images
+- Applications with build steps (compile, bundle, etc.)
+- When size/security matters
+
+**Single-stage for**:
+- Development (need tools)
+- Simple Python apps (no compilation)
+- When simplicity > optimization
+
+## Security
+
+### Run as Non-Root
+
 ```dockerfile
 RUN useradd -m -u 1000 appuser
 USER appuser
 ```
 
-### Scanning for Vulnerabilities
+**Why**: Limits damage if container is compromised
+
+### Scan for Vulnerabilities
 
 ```bash
-# Install trivy
-brew install trivy  # Mac
-# or apt-get install trivy  # Linux
+# Using Docker Scout
+docker scout cves fastapi-prod:latest
 
-# Scan image
-trivy image fastapi-prod
-
-# Scan with severity filter
-trivy image --severity HIGH,CRITICAL fastapi-prod
+# Using Trivy
+trivy image fastapi-prod:latest
 ```
 
 ### Minimal Base Images
 
-Consider alternatives:
-- `python:3.12-slim` - Current choice (good balance)
-- `python:3.12-alpine` - Even smaller (~50MB) but may have compatibility issues
-- `distroless/python3` - Google's minimal images (no shell)
+```dockerfile
+python:3.12-slim      # Good (smaller)
+python:3.12-alpine    # Better (smallest, but compatibility issues)
+python:3.12           # Avoid (huge, unnecessary)
+```
 
 ## Troubleshooting
 
-### Container Won't Start
+**Build fails**: Check Dockerfile syntax, network for downloads
 
-```bash
-# View logs
-docker logs fastapi-dev
+**Container exits immediately**: Check logs with `docker logs <container-id>`
 
-# Check if port is in use
-lsof -i :8080
+**Volume changes not detected**: Verify mount path, restart container
 
-# Inspect container
-docker inspect fastapi-dev
+**Permission errors**: Use same UID/GID as host user
 
-# Try running interactively
-docker run -it --rm -p 8080:8080 fastapi-dev bash
-```
+**Port already in use**: Find process with `lsof -i :8080` and kill it
 
-### Volume Mount Not Working
+See [Quick Reference](./quick-reference.md) for commands and [Development Guide](./development.md) for workflow help.
 
-```bash
-# Verify mount inside container
-docker exec fastapi-dev ls -la /code/src
+## Cloud Deployment Notes
 
-# Check permissions (Linux)
-ls -la ./src
+**Google Cloud Run**:
+- Uses Dockerfile.prod automatically
+- Scales to zero (cost-effective)
+- Max request timeout: 60 minutes
 
-# Try absolute path
-docker run -v /absolute/path/to/src:/code/src ...
-```
+**Azure Container Apps**:
+- Supports both Dockerfile types
+- Scale to zero available
+- Integrated with Azure ecosystem
 
-### Changes Not Detected
+**AWS ECS/Fargate**:
+- Use Dockerfile.prod
+- Push to ECR (Elastic Container Registry)
+- Task definitions configure resources
 
-```bash
-# Verify uvicorn is running with --reload
-docker exec fastapi-dev ps aux | grep uvicorn
-
-# Restart container
-docker restart fastapi-dev
-
-# Check logs for errors
-docker logs -f fastapi-dev
-```
-
-## Cloud Platform Specifics
-
-### Google Cloud Run
-- Uses Dockerfile.prod
-- Must listen on $PORT environment variable
-- Modify CMD: `CMD python -m src.main`
-- Set PORT=8080 in environment
-
-### Azure Container Apps
-- Uses Dockerfile.prod
-- Similar to Cloud Run
-- Configure port in portal
-
-### AWS ECS/Fargate
-- Uses Dockerfile.prod
-- Configure port mapping in task definition
-- Can use secrets manager for environment variables
+See cloud-specific branches for detailed deployment guides.
 
 ## Next Steps
 
-- Try both containers locally: [Development Guide](./development.md)
-- Understand the application: [Application Guide](./application.md)
-- Deploy to cloud: Check branch-specific tutorials
-  - [GCloud Branch](../../tree/gcloud)
-  - [Azure Branch](../../tree/azure)
+- **Development**: See [Development Guide](./development.md)
+- **Commands**: See [Quick Reference](./quick-reference.md)
+- **Deploy**: Check cloud-specific branches (gcloud, azure)
+- **Advanced**: Explore Kubernetes deployments
+
+---
+
+**Pro Tip**: Master docker-compose for development, multi-stage builds for production.
