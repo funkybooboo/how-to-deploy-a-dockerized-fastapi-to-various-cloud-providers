@@ -10,18 +10,15 @@
 
 set -e  # Exit on error
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Source shared libraries
+SCRIPT_DIR="$(dirname "$0")"
+source "${SCRIPT_DIR}/lib/colors.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
 
 echo -e "${YELLOW}⚠️  Google Cloud Resource Cleanup${NC}\n"
 
 # Load configuration if it exists
-if [ -f .gcloud-config ]; then
-    source .gcloud-config
+if load_config ".gcloud-config"; then
     echo -e "${GREEN}✅ Loaded configuration from .gcloud-config${NC}"
 else
     echo -e "${YELLOW}⚠️  No .gcloud-config found. Using defaults or prompting...${NC}"
