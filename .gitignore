@@ -62,6 +62,7 @@ dmypy.json
 
 # Cloud Provider
 .gcloudignore
+.gcloud-config
 key.json
 *-credentials.json
 service-account*.json

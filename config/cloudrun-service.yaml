@@ -1,0 +1,48 @@
+# Cloud Run service configuration
+# Reference: https://cloud.google.com/run/docs/reference/yaml/v1
+#
+# This file defines the Cloud Run service configuration.
+# You can use this with: gcloud run services replace cloudrun-service.yaml
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: fastapi-service
+  annotations:
+    # Allow all ingress traffic (internet-facing)
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # Auto-scaling configuration
+        autoscaling.knative.dev/minScale: "0"  # Scale to zero when idle
+        autoscaling.knative.dev/maxScale: "10"  # Maximum 10 instances
+    spec:
+      # Number of concurrent requests per instance
+      containerConcurrency: 80
+
+      # Maximum request timeout (5 minutes)
+      timeoutSeconds: 300
+
+      containers:
+      - image: us-central1-docker.pkg.dev/PROJECT_ID/fastapi-repo/fastapi:latest
+        ports:
+        - containerPort: 8080
+
+        # Environment variables
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DEBUG
+          value: "false"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: CORS_ORIGINS
+          value: "*"  # Replace with your domain in production
+
+        # Resource limits
+        resources:
+          limits:
+            cpu: "1"       # 1 vCPU
+            memory: "512Mi"  # 512MB RAM

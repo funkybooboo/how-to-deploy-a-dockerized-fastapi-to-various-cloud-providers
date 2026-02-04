@@ -1,48 +1,318 @@
-# Deploy Dockerized FastAPI to Google Cloud Run
+# Deploy FastAPI to Google Cloud Run
 
-A complete tutorial for deploying a containerized FastAPI application to Google Cloud using Cloud Run.
+Production-ready FastAPI application deployed to Google Cloud Run with automated CI/CD, comprehensive tutorials, and best practices.
 
-## What You'll Learn
+[![Deploy to Cloud Run](https://img.shields.io/badge/Google%20Cloud-Deploy-blue?logo=google-cloud)](https://cloud.google.com/run)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)](https://www.python.org/)
 
-- Set up a local development environment with Dev Containers
-- Build a FastAPI application
-- Deploy to Google Cloud Run
-- Set up CI/CD with GitHub Actions
+## 🚀 What You'll Build
 
-## Prerequisites
+A fully automated deployment pipeline that:
+- ✅ Runs tests automatically on every push
+- ✅ Builds Docker containers
+- ✅ Deploys to Google Cloud Run
+- ✅ Scales automatically from 0 to 1000+ instances
+- ✅ Costs $0 when idle
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [VS Code](https://code.visualstudio.com/download)
-- A Google Cloud account
-- `gcloud` CLI (installed in dev container)
+## 📚 Complete Tutorial Series
 
-## Tutorial Steps
+Follow our comprehensive, beginner-friendly tutorials:
 
-Follow these guides in order:
+1. **[Overview](./docs/tutorials/01-overview.md)** - What you'll build and why
+2. **[Prerequisites](./docs/tutorials/02-prerequisites.md)** - Required tools and accounts
+3. **[Local Setup](./docs/tutorials/03-local-setup.md)** - Dev Container environment
+4. **[Understanding FastAPI](./docs/tutorials/04-understanding-fastapi.md)** - Framework deep-dive
+5. **[Manual Deployment](./docs/tutorials/05-manual-deployment.md)** - Step-by-step deployment
+6. **[CI/CD Setup](./docs/tutorials/06-cicd-setup.md)** - Automate with GitHub Actions
+7. **[Monitoring](./docs/tutorials/07-monitoring.md)** - Logs, metrics, and debugging
+8. **[Cleanup](./docs/tutorials/08-cleanup.md)** - Remove resources safely
 
-1. **[Part 1: Create a Dev Container](./part_1.md)** - Set up local development environment
-2. **[Part 2: Build a FastAPI Application](./part_2.md)** - Create FastAPI endpoints
-3. **[Part 3: Deploy to Cloud Run](./part_3.md)** - Deploy to Google Cloud Run
-4. **[Part 4: Set Up CI/CD](./part_4.md)** - Configure GitHub Actions
+**Having issues?** Check [troubleshooting.md](./docs/tutorials/troubleshooting.md)
 
-## Quick Start
+## ⚡ Quick Start
+
+### Option 1: Deploy Immediately
 
 ```bash
+# Clone repository
 git clone <repo-url>
-cd <repo-name>
+cd how-to-deploy-a-dockerized-fastapi-to-various-cloud-providers
 git checkout gcloud
-code .
-# Reopen in Dev Container
+
+# Run setup
+./scripts/setup-gcloud.sh
+
+# Deploy
+./scripts/deploy-manual.sh
 ```
 
-## Architecture
+**Time:** ~10 minutes
 
-- **Application:** FastAPI Python web framework
-- **Container:** Docker with Python 3.12
-- **Registry:** Google Artifact Registry
-- **Hosting:** Google Cloud Run (serverless containers)
-- **CI/CD:** GitHub Actions
+### Option 2: Learn by Following Tutorials
 
-## Other Cloud Providers
+Start with [tutorials/01-overview.md](./docs/tutorials/01-overview.md) for a guided learning experience that explains concepts before implementation.
 
-See the [main branch README](../../tree/main) for Azure deployment.
+**Time:** ~3 hours (split across sessions)
+
+## 🏗️ Architecture
+
+```
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│   GitHub    │─────▶│GitHub Actions│─────▶│  Artifact   │
+│ Repository  │      │   (CI/CD)    │      │  Registry   │
+└─────────────┘      └──────────────┘      └─────────────┘
+                                                   │
+                                                   ▼
+┌─────────────┐                           ┌─────────────┐
+│   Users     │◀──────────────────────────│  Cloud Run  │
+│             │    HTTPS (auto-cert)      │  (Service)  │
+└─────────────┘                           └─────────────┘
+```
+
+**Components:**
+- **FastAPI** - Modern Python web framework with automatic API docs
+- **Docker** - Containerization for consistent deployments
+- **Artifact Registry** - Private container image storage
+- **Cloud Run** - Serverless container hosting with auto-scaling
+- **GitHub Actions** - Automated testing and deployment
+
+## 📁 Project Structure
+
+```
+├── src/
+│   ├── main.py              # FastAPI application entry point
+│   ├── config.py            # Environment-based configuration
+│   ├── api/                 # API endpoint modules
+│   │   ├── health.py        # Health check endpoints
+│   │   └── hello.py         # Example endpoints
+│   └── tests/               # Test suite
+│       └── test_api.py      # API endpoint tests
+├── docs/
+│   └── tutorials/           # Complete tutorial series (01-08)
+├── scripts/
+│   ├── setup-gcloud.sh      # Initial Google Cloud setup
+│   ├── deploy-manual.sh     # Manual deployment script
+│   └── cleanup.sh           # Resource cleanup script
+├── .github/
+│   └── workflows/
+│       ├── test.yaml        # Test workflow (main branch)
+│       └── deploy.yaml      # Deploy workflow (gcloud branch)
+├── Dockerfile.dev           # Development container
+├── Dockerfile.prod          # Production container
+├── requirements.txt         # Python dependencies
+└── requirements-dev.txt     # Development dependencies
+```
+
+## 🎯 Features
+
+### Security
+- ✅ Conditional debugging (only in development)
+- ✅ Environment-based CORS configuration
+- ✅ Service account-based authentication
+- ✅ No secrets in code (environment variables only)
+
+### Code Quality
+- ✅ Linting with Ruff
+- ✅ Formatting with Black
+- ✅ Type checking with MyPy
+- ✅ Test coverage with pytest
+- ✅ Comprehensive docstrings
+
+### Production Ready
+- ✅ Automatic API documentation (Swagger & ReDoc)
+- ✅ Health check endpoints
+- ✅ Structured logging
+- ✅ Error tracking
+- ✅ Resource limits and auto-scaling
+- ✅ Zero-downtime deployments
+
+### Developer Experience
+- ✅ VS Code Dev Container
+- ✅ Hot reload during development
+- ✅ Pre-configured debugging
+- ✅ Automated testing in CI/CD
+- ✅ Helper scripts for common tasks
+
+## 💰 Cost Estimate
+
+Google Cloud offers generous free tier:
+
+**Free Tier:**
+- 2 million requests per month
+- 360,000 GB-seconds of memory
+- 180,000 vCPU-seconds
+
+**Beyond Free Tier:**
+- Small API (10M requests/month): ~$15-20/month
+- Medium API (50M requests/month): ~$75-100/month
+
+**Cost optimization:**
+- Scales to zero when idle (default)
+- Pay only for actual request processing time
+- No charges for idle resources
+
+## 🛠️ Development
+
+### Local Development
+
+```bash
+# Open in VS Code
+code .
+
+# Reopen in Container (F1 → "Dev Containers: Reopen in Container")
+
+# Start development server (auto-reload enabled)
+uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+**Access:**
+- API: http://localhost:8080/
+- Docs: http://localhost:8080/api/docs
+- ReDoc: http://localhost:8080/api/redoc
+
+### Run Tests
+
+```bash
+# Run all tests
+pytest src/tests/ -v
+
+# Run with coverage
+pytest src/tests/ -v --cov=src --cov-report=term-missing
+
+# Run linting
+ruff check src/
+
+# Run type checking
+mypy src/
+
+# Format code
+black src/
+```
+
+### Manual Deployment
+
+```bash
+# Setup (first time only)
+./scripts/setup-gcloud.sh
+
+# Build and deploy
+./scripts/deploy-manual.sh
+
+# Or specify version tag
+./scripts/deploy-manual.sh v2
+```
+
+### View Logs
+
+```bash
+# Stream logs
+gcloud run services logs tail fastapi-service --region us-central1
+
+# View recent logs
+gcloud run services logs read fastapi-service --region us-central1 --limit 50
+```
+
+## 🔒 CI/CD Setup
+
+### Required GitHub Secrets
+
+1. Go to Repository → Settings → Secrets → Actions
+2. Add these secrets:
+   - `GCP_PROJECT_ID`: Your Google Cloud project ID
+   - `GCP_SA_KEY`: Service account key JSON
+
+**See [06-cicd-setup.md](./docs/tutorials/06-cicd-setup.md) for detailed instructions.**
+
+### Workflow Triggers
+
+- **Push to `gcloud` branch**: Runs tests → Builds → Deploys
+- **Pull Request**: Runs tests only (no deployment)
+- **Manual**: GitHub Actions → "Run workflow"
+
+## 📊 Monitoring
+
+**Cloud Console:**
+- Metrics: https://console.cloud.google.com/run
+- Logs: Click service → "Logs" tab
+- Errors: https://console.cloud.google.com/errors
+
+**CLI:**
+```bash
+# Tail logs
+gcloud run services logs tail fastapi-service --region us-central1
+
+# View metrics
+gcloud run services describe fastapi-service --region us-central1
+
+# Check costs
+# Cloud Console → Billing → Reports → Filter by "Cloud Run"
+```
+
+## 🧹 Cleanup
+
+To remove all resources and avoid charges:
+
+```bash
+./scripts/cleanup.sh
+```
+
+Or manually:
+```bash
+# Delete Cloud Run service
+gcloud run services delete fastapi-service --region us-central1 --quiet
+
+# Delete Artifact Registry repository
+gcloud artifacts repositories delete fastapi-repo --location us-central1 --quiet
+```
+
+## 🌐 Other Cloud Providers
+
+This repository supports multiple cloud providers:
+
+- **[Main Branch](../../tree/main)** - Cloud-agnostic base code
+- **[GCloud Branch](../../tree/gcloud)** - Google Cloud Run (you are here)
+- **[Azure Branch](../../tree/azure)** - Azure Container Apps (coming soon)
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+## 📖 Learn More
+
+**FastAPI:**
+- Official docs: https://fastapi.tiangolo.com/
+- Tutorial: https://fastapi.tiangolo.com/tutorial/
+
+**Google Cloud Run:**
+- Documentation: https://cloud.google.com/run/docs
+- Best practices: https://cloud.google.com/run/docs/best-practices
+- Pricing: https://cloud.google.com/run/pricing
+
+**Docker:**
+- Get started: https://docs.docker.com/get-started/
+- Best practices: https://docs.docker.com/develop/dev-best-practices/
+
+## 📝 License
+
+This project is licensed under the MIT License - see LICENSE file for details.
+
+## ⭐ Support
+
+If you find this helpful:
+- ⭐ Star this repository
+- 🐛 Report issues
+- 💡 Suggest improvements
+- 📢 Share with others
+
+---
+
+**Ready to start?** Go to [docs/tutorials/01-overview.md](./docs/tutorials/01-overview.md)
+
+**Need help?** Check [troubleshooting.md](./docs/tutorials/troubleshooting.md)
