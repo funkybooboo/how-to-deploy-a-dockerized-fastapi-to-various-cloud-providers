@@ -1551,6 +1551,862 @@ Create learning branch for Azure similar to gcloud-starter.
 
 ---
 
+## PHASE 6: Repository Standardization & Quality Improvements ⏳ IN PROGRESS
+
+### Overview
+
+After completing Phases 1-5, comprehensive quality analysis revealed significant inconsistencies, bloat, and gaps across all branches. Phase 6-11 focuses on standardizing the repository, eliminating redundancy, and ensuring consistent high-quality experience across all cloud platforms.
+
+**Key Findings from Analysis:**
+1. **Azure-starter INCOMPLETE**: Missing 5 critical files that gcloud-starter has
+2. **Documentation Bloat**: LEARNING-PATH.md at 1,500+ lines, docker.md at 626 lines
+3. **Script Duplication**: Color definitions and config loading repeated across all scripts
+4. **Tutorial Inconsistency**: GCloud tutorials 350 lines longer than Azure equivalents
+5. **Main Branch Issues**: Triple documentation of getting started content
+6. **Naming Inconsistencies**: Workflow references wrong file names
+
+**Net Impact Goal**: Remove ~1,500 lines (bloat) + Add ~900 lines (completions/enhancements) = **-360 lines overall with significantly more value**
+
+---
+
+### Sub-Phase 6.1: Fix Critical Issues (HIGHEST PRIORITY)
+
+#### Complete Azure-Starter Branch
+
+**Problem**: Azure-starter has only PARTIALLY implemented the learning version that gcloud-starter provides comprehensively.
+
+**Missing Files to Create:**
+
+- [ ] **scripts/deploy-manual.sh** (with 15 TODO markers)
+  - Port from gcloud-starter deploy-manual.sh
+  - Adapt for Azure Container Apps instead of Cloud Run
+  - TODO sections:
+    1. Error handling setup
+    2. Color definitions
+    3. Load configuration from .azure-config
+    4. Get variables (resource group, ACR name, etc.)
+    5. Set default variables
+    6. Construct image name (ACR format)
+    7. Display configuration
+    8. Check if Docker is running
+    9. Build Docker image
+    10. Tag as latest if specific version provided
+    11. Login to ACR and push image
+    12. Get ACR credentials
+    13. Create or update Container App
+    14. Get service URL/FQDN
+    15. Test deployment with curl
+  - Target: ~150-165 lines
+  - Include comprehensive hints for each TODO
+  - Reference docs/tutorials/05-manual-deployment.md
+
+- [ ] **.github/workflows/cd.yaml** (with 9 TODO markers)
+  - Port from gcloud-starter cd.yaml
+  - Adapt for Azure (service principal instead of service account)
+  - TODO sections:
+    1. Configure environment variables
+    2. Azure login step
+    3. Set up Azure CLI
+    4. Configure Docker for ACR
+    5. Build Docker image
+    6. Push Docker image to ACR
+    7. Deploy to Azure Container Apps
+    8. Get service URL/FQDN
+    9. Verify deployment
+  - Target: ~100-120 lines
+  - Include hints about Azure-specific authentication
+  - Reference docs/tutorials/06-cicd-setup.md
+
+- [ ] **docs/tutorials/LEARNING-PATH.md**
+  - Adapt from gcloud-starter LEARNING-PATH.md
+  - **CRITICAL**: Keep it concise at 600-700 lines (vs gcloud-starter's bloated 1,500 lines)
+  - Focus on Azure-specific concepts:
+    - ACR (Azure Container Registry) instead of Artifact Registry
+    - Container Apps instead of Cloud Run
+    - Service principals instead of service accounts
+    - Resource groups and environments
+  - Include:
+    - Step-by-step progression through TODO markers
+    - Learning objectives and prerequisites
+    - Hints and pro tips
+    - Progress tracking checklist
+    - Common questions and answers
+    - Expected output for each step
+    - Debugging guidance
+    - What's next suggestions
+  - Target: 600-700 lines (avoid bloat from gcloud-starter version)
+
+- [ ] **scripts/validate-setup.sh**
+  - Port from gcloud-starter validate-setup.sh
+  - Adapt for Azure resources
+  - Check:
+    - Azure CLI installed and available
+    - Logged in to Azure (az account show)
+    - Docker installed and running
+    - Git installed
+    - VS Code installed (optional)
+    - Azure resources exist (resource group, ACR, Container App environment)
+    - TODO completion status in scripts
+  - Display:
+    - Status for each check (✅ or ❌)
+    - Next steps if checks fail
+    - Progress summary
+  - Target: ~80-100 lines
+
+- [ ] **scripts/reset.sh**
+  - Port from gcloud-starter reset.sh
+  - Adapt for Azure
+  - Features:
+    - Reset files to TODO state using git
+    - Optionally clean Azure resources
+    - Require confirmation before reset
+    - Display what will be reset
+    - Preserve local changes option
+  - Target: ~60-80 lines
+
+**Verification**:
+- Azure-starter has same file count as gcloud-starter
+- All 5 missing files present and functional
+- Learning experience is equivalent between cloud platforms
+
+#### Fix GCloud README Workflow References
+
+**Problem**: GCloud branch README references wrong workflow file names.
+
+- [ ] Update `README.md` on gcloud branch
+  - Line ~101-102: Change references from `test.yaml` → `ci.yaml`
+  - Line ~101-102: Change references from `deploy.yaml` → `cd.yaml`
+  - Verify all workflow references throughout README
+  - Check CONTRIBUTING.md for same issues
+  - Ensure consistency across all mentions
+
+**Verification**:
+- All workflow references accurate
+- No mentions of old file names
+- Links work correctly
+
+---
+
+### Sub-Phase 6.2: Eliminate Script Duplication
+
+#### Create Shared Script Libraries
+
+**Problem**: Every script duplicates 18-20 lines of color definitions and config loading logic.
+
+- [ ] Create `scripts/lib/` directory on all branches (gcloud, gcloud-starter, azure, azure-starter)
+
+- [ ] Create `scripts/lib/colors.sh` (~15 lines)
+  ```bash
+  #!/bin/bash
+  # Color definitions for script output
+
+  # Standard colors
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  BLUE='\033[0;34m'
+  CYAN='\033[0;36m'
+  MAGENTA='\033[0;35m'
+  NC='\033[0m' # No Color
+
+  # Bold variants
+  BOLD='\033[1m'
+  DIM='\033[2m'
+  ```
+
+- [ ] Create `scripts/lib/config.sh` (~25 lines)
+  ```bash
+  #!/bin/bash
+  # Configuration file handling utilities
+
+  load_config() {
+      local config_file=$1
+      if [ -f "$config_file" ]; then
+          source "$config_file"
+          echo -e "${GREEN}✅ Loaded configuration from $config_file${NC}"
+          return 0
+      else
+          echo -e "${YELLOW}⚠️  No $config_file found${NC}"
+          return 1
+      fi
+  }
+
+  save_config() {
+      local config_file=$1
+      shift
+      echo "# Auto-generated configuration" > "$config_file"
+      echo "# Generated: $(date)" >> "$config_file"
+      for var in "$@"; do
+          echo "$var" >> "$config_file"
+      done
+      echo -e "${GREEN}✅ Configuration saved to $config_file${NC}"
+  }
+
+  prompt_with_default() {
+      local prompt=$1
+      local default=$2
+      local result
+      read -p "$prompt [$default]: " result
+      echo "${result:-$default}"
+  }
+  ```
+
+**Net Reduction per Branch**: 60-72 lines removed across all scripts
+
+#### Refactor All Scripts to Use Libraries
+
+**Scripts to Refactor on gcloud/gcloud-starter**:
+
+- [ ] **scripts/setup-gcloud.sh**
+  - Add at top: `source "$(dirname "$0")/lib/colors.sh"`
+  - Add at top: `source "$(dirname "$0")/lib/config.sh"`
+  - Remove lines 14-21: Color definitions (18 lines removed)
+  - Replace config loading logic with `load_config .gcloud-config`
+  - Replace config saving with `save_config` function
+  - **Reduction**: ~18 lines
+
+- [ ] **scripts/deploy-manual.sh**
+  - Add library sourcing
+  - Remove color definitions
+  - Use `load_config` function
+  - **Reduction**: ~18 lines
+
+- [ ] **scripts/cleanup.sh**
+  - Add library sourcing
+  - Remove color definitions
+  - Use `load_config` function
+  - **Reduction**: ~12 lines
+
+**Scripts to Refactor on azure/azure-starter**:
+
+- [ ] **scripts/setup-azure.sh**
+  - Same refactoring as gcloud version
+  - **Reduction**: ~18 lines
+
+- [ ] **scripts/deploy-manual.sh**
+  - Same refactoring as gcloud version
+  - **Reduction**: ~18 lines
+
+- [ ] **scripts/cleanup.sh**
+  - Same refactoring as gcloud version
+  - **Reduction**: ~12 lines
+
+**Total Reduction**: 60-72 lines per branch × 4 branches = 240-288 lines eliminated
+
+**Verification**:
+- All scripts source lib files correctly
+- Behavior unchanged, just cleaner structure
+- Error handling preserved
+- Tests pass (if applicable)
+
+---
+
+### Sub-Phase 6.3: Balance Tutorial Quality & Eliminate Bloat
+
+#### Streamline GCloud Tutorials (Reduce Verbosity)
+
+**Tutorial 05 (manual-deployment.md)**: 731 → 580-620 lines (15-20% reduction)
+
+- [ ] Extract repeated `gcloud run deploy` command explanations
+  - Currently explained 4+ times throughout the tutorial
+  - Create "Command Reference" section at end with comprehensive explanation
+  - Replace repetitions with references: "See Command Reference for parameters"
+- [ ] Condense step-by-step sections
+  - Combine similar verification steps
+  - Remove redundant explanations
+  - Keep educational value, remove repetition
+- [ ] Streamline examples
+  - One comprehensive example instead of multiple similar ones
+  - Use callout boxes for variations
+- **Target**: 580-620 lines (maintaining quality)
+
+**Tutorial 06 (cicd-setup.md)**: 647 → 480-520 lines (25-30% reduction)
+
+- [ ] Condense CI/CD basics section (lines 5-80)
+  - Currently 75 lines explaining what CI/CD is
+  - Reduce to ~20 lines with external reference
+  - Keep project-specific CI/CD explanation
+- [ ] Extract GitHub Actions syntax explanations
+  - Move generic YAML syntax to callout boxes
+  - Focus on this project's specific workflow
+- [ ] Streamline service account setup
+  - Consolidate permission explanations
+  - Use tables for role descriptions
+- **Target**: 480-520 lines
+
+**LEARNING-PATH.md (gcloud-starter)**: 1,500+ → 600-700 lines (53% reduction)
+
+- [ ] **Remove 6 duplicate TODO explanation sections**
+  - Currently appears: lines ~77-98, ~157-183, ~268-290, and 3 more locations
+  - Keep: 1 comprehensive TODO explanation section
+  - Remove: All duplicates
+
+- [ ] **Consolidate 3 progress tracking sections**
+  - Currently: lines ~32-50, ~250-280, ~350-370
+  - Keep: 1 comprehensive progress tracking guide
+  - Add checklist format for easy reference
+
+- [ ] **Remove repetitive "How to test" sections**
+  - Currently repeated for each step (7-8 times)
+  - Create: Single "Testing Your Work" section
+  - Reference: From each step
+
+- [ ] **Keep these sections** (essential):
+  - Critical path overview
+  - Step-by-step instructions for each TODO
+  - Hints and pro tips
+  - Common questions and answers
+  - Link to tutorials
+
+- **Target**: 600-700 lines (high quality, no bloat)
+
+#### Enhance Azure Tutorials (Add Quality)
+
+**Tutorial 05 (manual-deployment.md)**: 588 → 580-620 lines (+40 educational lines)
+
+- [ ] **Add "What is Azure Container Apps?" section**
+  - Match depth of gcloud's "What is Cloud Run?" section
+  - Explain: serverless container hosting, Kubernetes-based
+  - Comparison table: Container Apps vs App Service vs AKS
+  - Benefits and use cases
+
+- [ ] **Add pricing breakdown and cost analysis**
+  - Free tier details
+  - Example calculations
+  - Cost optimization tips
+  - Budget alert setup
+
+- [ ] **Add architecture diagrams**
+  - Request flow diagram
+  - Container lifecycle
+  - Resource relationship diagram
+
+- [ ] **Add cold start explanation**
+  - What are cold starts
+  - How Azure handles them
+  - Mitigation strategies
+
+- **Target**: 580-620 lines
+
+**Tutorial 06 (cicd-setup.md)**: 410 → 480-520 lines (+100 educational lines)
+
+- [ ] **Add service principal detailed explanation**
+  - What is a service principal
+  - How it differs from user accounts
+  - Why needed for CI/CD
+  - Permission scoping
+
+- [ ] **Add Azure-specific security considerations**
+  - RBAC (Role-Based Access Control)
+  - Managed identities vs service principals
+  - Secret rotation strategies
+  - Audit logging
+
+- [ ] **Add troubleshooting section**
+  - Common Azure authentication issues
+  - ACR push failures
+  - Container App deployment errors
+  - GitHub Actions Azure-specific problems
+
+- [ ] **Match gcloud's depth** of GitHub Actions explanation
+  - Workflow anatomy
+  - Azure login action details
+  - Best practices for Azure deployments
+
+- **Target**: 480-520 lines
+
+**Verification**:
+- GCloud tutorials reduced by ~350 lines total
+- Azure tutorials enhanced by ~140 lines total
+- Both platforms have tutorials within 10% of each other in length
+- Educational quality is equivalent between platforms
+
+---
+
+### Sub-Phase 6.4: Improve Main Branch Documentation
+
+#### Create Navigation Hub
+
+- [ ] **Expand docs/README.md** from 43 to ~120 lines
+
+  **Add Decision Tree**:
+  ```markdown
+  ## I want to...
+
+  **→ Run the app locally**
+    - Start here: [Getting Started](./getting-started.md)
+    - Then see: [Development Guide](./development.md)
+
+  **→ Understand the application architecture**
+    - Read: [Application Guide](./application.md)
+    - Then: [API Reference](./api-reference.md)
+
+  **→ Learn about Docker setup**
+    - Start: [Docker Guide](./docker.md)
+    - Quick reference: [Quick Reference](./quick-reference.md)
+
+  **→ Deploy to cloud**
+    - Switch to branch: `gcloud` or `azure`
+    - Follow tutorials in docs/tutorials/
+  ```
+
+  **Add Learning Paths**:
+  - Beginner: getting-started → application → development
+  - Intermediate: docker → advanced topics
+  - Advanced: API reference → custom extensions
+
+  **Add Estimated Reading Times**:
+  - Getting Started: 15 minutes
+  - Application Guide: 20 minutes
+  - Docker Guide: 30 minutes
+  - etc.
+
+#### Consolidate Getting Started Content
+
+- [ ] **Simplify docs/development.md** (208 → 120-140 lines)
+  - **Remove duplicated content** (lines 4-37)
+    - Docker Compose commands already in getting-started.md
+    - Volume mount explanations duplicated
+    - Environment variable setup duplicated
+  - **Focus on advanced workflows**:
+    - Development workflow best practices
+    - Debugging setup
+    - Hot reload configuration
+    - Running specific tests
+    - Code quality tools usage
+  - **Keep**:
+    - Manual Docker commands (for understanding)
+    - Development container details
+    - Advanced development tips
+
+**Alternative Approach (NOT recommended)**: Merge both into single guide
+- Reason against: getting-started.md serves beginners, development.md serves regular developers
+- Better to keep separate with clear scoping
+
+#### Streamline docker.md
+
+- [ ] **Reduce from 626 to 450-480 lines** (23-28% reduction)
+
+  **Changes**:
+  - **Lines 56-123: Condense layer-by-layer explanations**
+    - Currently 68 lines of detailed layer breakdown
+    - Reduce to ~40 lines
+    - Move excessive detail to "Docker Deep Dive" appendix
+    - Keep essential explanations
+
+  - **Lines 353-450: Move Docker command cheatsheet**
+    - Currently ~100 lines of commands
+    - Extract to new docs/quick-reference.md
+    - Keep only 3-4 most common commands in docker.md
+    - Reference quick-reference.md for full list
+
+  - **Lines 497-526: Expand multi-stage builds section**
+    - Currently only 30 lines (underdeveloped)
+    - This is important topic, deserves 50-60 lines
+    - Add diagram of stages
+    - Explain benefits clearly
+
+  - **Lines 602-618: Improve cloud platform section**
+    - Currently only 17 lines for 3 providers
+    - Either expand to 40-50 lines with examples
+    - Or remove and reference branch-specific docs
+
+  **Target**: 450-480 lines
+
+#### Add Quick Reference Guide
+
+- [ ] **Create docs/quick-reference.md** (~150 lines)
+
+  **Contents**:
+  - **Common Docker Commands** (40 lines)
+    - Build, run, stop, remove
+    - Logs, exec, inspect
+    - Tag, push, pull
+    - System prune
+
+  - **Common docker-compose Patterns** (30 lines)
+    - Up, down, build
+    - Logs, exec
+    - Scale, restart
+
+  - **FastAPI Endpoint Testing** (30 lines)
+    - curl examples for each endpoint
+    - Expected responses
+    - Error codes
+
+  - **Environment Variable Reference** (25 lines)
+    - Table of all variables
+    - Descriptions
+    - Default values
+    - Examples
+
+  - **Troubleshooting Checklist** (25 lines)
+    - Docker not running?
+    - Port conflicts?
+    - Build failures?
+    - Module not found?
+    - Permission denied?
+
+**Verification**:
+- docs/README.md provides clear navigation
+- No duplication between getting-started.md and development.md
+- docker.md is comprehensive but not overwhelming
+- Quick reference available for experienced users
+
+---
+
+### Sub-Phase 6.5: Cross-Branch Standardization
+
+#### Standardize Script Structure
+
+- [ ] **Define and implement standard script header** for all scripts:
+  ```bash
+  #!/bin/bash
+  # <Script description>
+  #
+  # This script <what it does>
+  #
+  # Prerequisites:
+  #   - <prerequisite 1>
+  #   - <prerequisite 2>
+  #
+  # Usage: ./<script-name>.sh [arguments]
+  # Validation: ./scripts/validate-setup.sh (if applicable)
+  # Reset: ./scripts/reset.sh (if applicable)
+
+  set -e  # Exit on error
+
+  # Source shared libraries
+  SCRIPT_DIR="$(dirname "$0")"
+  source "$SCRIPT_DIR/lib/colors.sh"
+  source "$SCRIPT_DIR/lib/config.sh"
+
+  # Script content...
+  ```
+
+- [ ] **Apply to all scripts** on all branches:
+  - scripts/setup-*.sh
+  - scripts/deploy-manual.sh
+  - scripts/cleanup.sh
+  - scripts/validate-setup.sh (on starter branches)
+  - scripts/reset.sh (on starter branches)
+
+#### Standardize README Structure
+
+- [ ] **Define standard README sections** (all branch READMEs should have):
+  1. **Title and Badges**
+     - Cloud provider logo/badge
+     - Build status badge
+     - License badge
+
+  2. **One-line Description**
+     - What this deployment does
+
+  3. **What You'll Learn** (3-5 bullets)
+     - Key learning outcomes
+
+  4. **Prerequisites** (with links)
+     - Required tools
+     - Required accounts
+
+  5. **Quick Start** (code block)
+     - Fastest way to deploy
+
+  6. **Tutorial/Documentation Links**
+     - Link to docs/tutorials/
+     - Link to main docs/
+
+  7. **Architecture** (diagram/description)
+     - How components fit together
+
+  8. **Project Structure**
+     - Directory tree
+     - Key files explained
+
+  9. **Features**
+     - Security
+     - Code quality
+     - Production ready
+     - Developer experience
+
+  10. **Development**
+      - Run locally
+      - Run tests
+      - Manual deployment
+
+  11. **CI/CD**
+      - Required secrets
+      - Workflow triggers
+
+  12. **Monitoring**
+      - How to view logs
+      - How to check metrics
+
+  13. **Cleanup**
+      - How to remove resources
+
+  14. **Other Branches/Cloud Providers**
+      - Links to other options
+
+  15. **Credits and License**
+
+- [ ] **Apply to all branches**:
+  - main
+  - gcloud
+  - gcloud-starter
+  - azure
+  - azure-starter
+
+#### Ensure Naming Consistency
+
+- [ ] **Verify across all branches**:
+  - **Workflows**: Always `ci.yaml` and `cd.yaml` (NOT test.yaml or deploy.yaml)
+  - **Scripts**: Always `setup-*.sh`, `deploy-manual.sh`, `cleanup.sh`
+  - **Docs**: Consistent file naming (01-overview.md, 02-prerequisites.md, etc.)
+  - **Config files**: Consistent naming (.gcloud-config, .azure-config)
+
+- [ ] **Check and fix**:
+  - README references
+  - CONTRIBUTING.md references
+  - Tutorial references
+  - Script references
+
+**Verification**:
+- All scripts follow standard structure
+- All READMEs have consistent sections
+- No naming inconsistencies across branches
+- Documentation references are accurate
+
+---
+
+### Sub-Phase 6.6: Verification & Testing
+
+#### Script Functionality Tests
+
+- [ ] **For gcloud branch**:
+  - Run setup-gcloud.sh (dry run if possible or in test project)
+  - Verify output and config file creation
+  - Run deploy-manual.sh (verify commands would work)
+  - Check cleanup.sh shows correct warnings
+
+- [ ] **For gcloud-starter branch**:
+  - Run validate-setup.sh
+  - Verify it checks all prerequisites
+  - Test reset.sh
+  - Confirm it resets files correctly
+
+- [ ] **For azure branch**:
+  - Run setup-azure.sh (dry run)
+  - Verify config file creation
+  - Run deploy-manual.sh (verify commands)
+  - Check cleanup.sh warnings
+
+- [ ] **For azure-starter branch**:
+  - Run validate-setup.sh
+  - Test reset.sh
+  - Verify TODO markers are preserved after reset
+
+#### Documentation Link Validation
+
+- [ ] **Check all internal links work**:
+  - README links to tutorials
+  - Tutorial links to next tutorial
+  - Tutorial links to troubleshooting
+  - Cross-references between docs
+
+- [ ] **Verify cross-references are accurate**:
+  - File paths mentioned in docs exist
+  - Line numbers in references are current
+  - Command examples are correct
+
+- [ ] **Ensure tutorial sequences flow correctly**:
+  - 01 → 02 → 03 → ... → 08
+  - Each tutorial links to next
+  - "Next Steps" sections are accurate
+
+- [ ] **Test "Next Steps" links**:
+  - End of each tutorial
+  - README quick start
+  - LEARNING-PATH progression
+
+#### Learning Path Walkthrough
+
+- [ ] **Complete gcloud-starter learning path**:
+  - Follow LEARNING-PATH.md start to finish
+  - Complete all TODO markers
+  - Time the process (should be ~4-6 hours)
+  - Note any confusing sections
+  - Verify validation script works
+
+- [ ] **Complete azure-starter learning path**:
+  - Follow LEARNING-PATH.md start to finish
+  - Complete all TODO markers
+  - Time the process (should be ~4-6 hours)
+  - Compare to gcloud-starter experience
+  - Ensure equivalent difficulty
+
+#### Cross-Branch Audit
+
+- [ ] **Create and complete checklist**:
+  - [ ] All branches have consistent README structure
+  - [ ] All scripts use shared libraries
+  - [ ] GCloud and Azure tutorials are equivalent in quality
+  - [ ] gcloud-starter and azure-starter have same file count
+  - [ ] Documentation has no duplication
+  - [ ] All workflow references are correct
+  - [ ] All naming is consistent
+  - [ ] Learning experiences are equivalent
+  - [ ] No broken links
+  - [ ] All TODO markers have hints
+  - [ ] Validation scripts work
+  - [ ] Reset scripts work
+
+**Verification Complete When**:
+- All checklist items checked
+- No critical issues found
+- Documentation is cohesive
+- Learning paths are equivalent
+
+---
+
+## Success Metrics for Phase 6-11
+
+### Completeness Metrics
+- ✅ Azure-starter has all 5 missing files
+- ✅ All branches have shared script libraries (scripts/lib/)
+- ✅ All READMEs have consistent structure
+- ✅ All tutorials reference each other properly
+
+### Quality Parity Metrics
+- ✅ GCloud and Azure tutorials within 10% length
+- ✅ gcloud-starter and azure-starter have equivalent learning experience
+- ✅ All tutorials have comprehensive educational content
+- ✅ Both cloud platforms have same file count and structure
+
+### Bloat Elimination Metrics
+- ✅ LEARNING-PATH.md reduced by 50% (1,500 → 700 lines)
+- ✅ docker.md reduced by 25% (626 → 470 lines)
+- ✅ Script duplication eliminated (60-72 lines per branch)
+- ✅ Tutorial verbosity reduced (gcloud: -350 lines)
+- ✅ Main branch documentation streamlined (-100 lines)
+
+### Standardization Metrics
+- ✅ All scripts follow standard structure
+- ✅ All workflow names consistent across branches
+- ✅ All documentation uses consistent formatting
+- ✅ All README files have identical section structure
+- ✅ All config files use consistent naming
+
+### Net Impact
+- **Lines removed** (bloat): ~1,500
+- **Lines added** (completions/enhancements): ~900
+- **Net change**: -360 lines
+- **Quality improvement**: Significant (consistent, no duplication, better organization)
+
+---
+
+## Critical Files Modified in Phase 6-11
+
+### Azure-Starter Branch (CREATE - Priority 1)
+```
+NEW: scripts/deploy-manual.sh (150-165 lines, 15 TODO markers)
+NEW: .github/workflows/cd.yaml (100-120 lines, 9 TODO markers)
+NEW: docs/tutorials/LEARNING-PATH.md (600-700 lines)
+NEW: scripts/validate-setup.sh (80-100 lines)
+NEW: scripts/reset.sh (60-80 lines)
+```
+
+### GCloud Branch (MODIFY - Priority 1)
+```
+MOD: README.md (fix workflow references: test.yaml→ci.yaml, deploy.yaml→cd.yaml)
+```
+
+### All Branches with Scripts (CREATE - Priority 2)
+```
+NEW: scripts/lib/colors.sh (~15 lines per branch)
+NEW: scripts/lib/config.sh (~25 lines per branch)
+```
+
+### All Branches with Scripts (MODIFY - Priority 2)
+```
+MOD: scripts/setup-*.sh (refactor to use lib, -18 lines per script)
+MOD: scripts/deploy-manual.sh (refactor to use lib, -18 lines per script)
+MOD: scripts/cleanup.sh (refactor to use lib, -12 lines per script)
+```
+
+### GCloud Branch (MODIFY - Priority 3)
+```
+MOD: docs/tutorials/05-manual-deployment.md (731 → 580-620 lines, -111 to -151 lines)
+MOD: docs/tutorials/06-cicd-setup.md (647 → 480-520 lines, -127 to -167 lines)
+```
+
+### GCloud-Starter Branch (MODIFY - Priority 3)
+```
+MOD: docs/tutorials/LEARNING-PATH.md (1,500+ → 600-700 lines, -800 to -900 lines)
+```
+
+### Azure Branch (MODIFY - Priority 3)
+```
+MOD: docs/tutorials/05-manual-deployment.md (588 → 580-620 lines, +40 educational lines)
+MOD: docs/tutorials/06-cicd-setup.md (410 → 480-520 lines, +100 educational lines)
+```
+
+### Main Branch (MODIFY - Priority 4)
+```
+MOD: docs/README.md (43 → ~120 lines, +77 lines with navigation)
+MOD: docs/development.md (208 → 120-140 lines, -68 to -88 lines)
+MOD: docs/docker.md (626 → 450-480 lines, -146 to -176 lines)
+NEW: docs/quick-reference.md (~150 lines)
+```
+
+### All Branches (MODIFY - Priority 5)
+```
+MOD: README.md (standardize structure across all branches)
+MOD: All scripts (standardize header format)
+```
+
+---
+
+## Timeline Estimate for Phase 6-11
+
+**Total Estimated Time**: 30-40 hours of focused work
+
+### Week 1: Critical Issues (12-15 hours)
+- Sub-Phase 6.1: Complete azure-starter (8-10 hours)
+  - deploy-manual.sh with TODOs (2 hours)
+  - cd.yaml with TODOs (1.5 hours)
+  - LEARNING-PATH.md (3 hours)
+  - validate-setup.sh (1 hour)
+  - reset.sh (0.5 hours)
+- Sub-Phase 6.1: Fix gcloud README (0.5 hours)
+- Sub-Phase 6.2: Create shared libraries (2 hours)
+- Sub-Phase 6.2: Refactor scripts (2-3 hours)
+
+### Week 2: Content Quality (10-12 hours)
+- Sub-Phase 6.3: Streamline gcloud tutorials (4-5 hours)
+  - Tutorial 05 (2 hours)
+  - Tutorial 06 (2 hours)
+  - LEARNING-PATH.md (0-1 hours)
+- Sub-Phase 6.3: Enhance azure tutorials (3-4 hours)
+  - Tutorial 05 (1.5 hours)
+  - Tutorial 06 (1.5-2 hours)
+- Sub-Phase 6.4: Improve main branch (3 hours)
+  - docs/README.md (1 hour)
+  - docs/development.md (0.5 hours)
+  - docs/docker.md (1 hour)
+  - docs/quick-reference.md (0.5 hours)
+
+### Week 3: Standardization & Testing (8-13 hours)
+- Sub-Phase 6.5: Standardize scripts (2-3 hours)
+- Sub-Phase 6.5: Standardize READMEs (3-4 hours)
+- Sub-Phase 6.5: Ensure naming consistency (1-2 hours)
+- Sub-Phase 6.6: Script testing (1-2 hours)
+- Sub-Phase 6.6: Documentation validation (1 hour)
+- Sub-Phase 6.6: Learning path walkthrough (2-3 hours)
+- Sub-Phase 6.6: Cross-branch audit (1 hour)
+
+---
+
 ## Final Phase: Main Branch Updates
 
 ### Overview
@@ -1639,10 +2495,12 @@ Update main branch README to tie everything together.
 ```
 ✅ main               - Cloud-agnostic base (Phase 1 complete)
 ✅ gcloud             - Google Cloud complete (Phase 2 complete)
-⏳ gcloud-starter     - Google Cloud learning (Phase 3 pending)
-⏳ azure              - Azure complete (Phase 4 pending)
-⏳ azure-starter      - Azure learning (Phase 5 pending)
+✅ gcloud-starter     - Google Cloud learning (Phase 3 COMPLETE)
+✅ azure              - Azure complete (Phase 4 COMPLETE)
+✅ azure-starter      - Azure learning (Phase 5 COMPLETE - PARTIAL)
 ```
+
+**Note**: Phase 5 (azure-starter) was partially completed. Missing components identified in Phase 6.
 
 ### Files Created - Phase 1 (Main Branch)
 
@@ -1729,9 +2587,9 @@ Update main branch README to tie everything together.
 
 ---
 
-**Last Updated**: Phase 2 completed - GCloud branch with comprehensive tutorials and automation
-**Next Step**: Phase 3 - Create gcloud-starter learning branch
-**Timeline**: Phases 3-5 pending user request
+**Last Updated**: Phases 1-5 completed, Phase 6-11 (Standardization) in progress
+**Current Step**: Phase 6 - Repository Standardization & Quality Improvements
+**Timeline**: Phases 6-11 approved and in progress
 
 ---
 
@@ -1866,9 +2724,36 @@ Update main branch README to tie everything together.
 ✅ Full automation (scripts + CI/CD)
 ```
 
-### Future Phases Planned
+### Completed Phases
 
-**Phase 3**: GCloud starter branch for hands-on learning
-**Phase 4**: Azure complete branch for production deployment
-**Phase 5**: Azure starter branch for hands-on learning
-**Final Phase**: Main branch documentation tying everything together
+**Phase 1**: ✅ Main Branch Foundation (security, tests, code quality)
+**Phase 2**: ✅ GCloud Complete Branch (production deployment, tutorials, CI/CD)
+**Phase 3**: ✅ GCloud Starter Branch (learning version with TODO markers)
+**Phase 4**: ✅ Azure Complete Branch (production deployment, tutorials, CI/CD)
+**Phase 5**: ✅ Azure Starter Branch (PARTIAL - setup script only)
+
+### Current Phase
+
+**Phase 6**: ⏳ Repository Standardization & Quality Improvements (IN PROGRESS)
+- Sub-Phase 6.1: Fix Critical Issues (azure-starter completion, gcloud README fixes)
+- Sub-Phase 6.2: Eliminate Script Duplication (shared libraries)
+- Sub-Phase 6.3: Balance Tutorial Quality (streamline gcloud, enhance azure)
+- Sub-Phase 6.4: Improve Main Branch Documentation
+- Sub-Phase 6.5: Cross-Branch Standardization
+- Sub-Phase 6.6: Verification & Testing
+
+### Future Considerations (Deferred)
+
+**Cloud Provider Expansion**:
+- AWS branch (App Runner or ECS Fargate)
+- DigitalOcean branch (App Platform)
+- Linode branch (Kubernetes or similar)
+
+**Advanced Features**:
+- Multi-cloud comparison documentation
+- Cost comparison across clouds
+- Performance benchmarking
+- Database integration tutorials
+- Authentication examples
+- Custom domain setup
+- Advanced monitoring with alerts
