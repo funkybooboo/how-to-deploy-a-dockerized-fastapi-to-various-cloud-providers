@@ -8,12 +8,10 @@
 
 set -e  # Exit on error
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Source shared libraries
+SCRIPT_DIR="$(dirname "$0")"
+source "${SCRIPT_DIR}/lib/colors.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
 
 echo -e "${GREEN}🚀 Setting up Google Cloud environment for FastAPI deployment${NC}\n"
 
@@ -102,10 +100,9 @@ echo -e "  ${GREEN}./scripts/deploy-manual.sh${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}\n"
 
 # Save configuration for other scripts
-cat > .gcloud-config << EOF
-PROJECT_ID=${PROJECT_ID}
-REGION=${REGION}
-REPOSITORY=${REPO_NAME}
-EOF
+save_config ".gcloud-config" \
+    "PROJECT_ID=${PROJECT_ID}" \
+    "REGION=${REGION}" \
+    "REPOSITORY=${REPO_NAME}"
 
 echo -e "${GREEN}Configuration saved to .gcloud-config${NC}"
