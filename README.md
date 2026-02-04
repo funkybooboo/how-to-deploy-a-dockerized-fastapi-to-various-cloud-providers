@@ -6,6 +6,8 @@ Production-ready FastAPI application deployed to Google Cloud Run with automated
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)](https://www.python.org/)
 
+> **📚 General Documentation**: For application architecture, Docker guides, and local development, see the [docs/](./docs/) directory with 5 comprehensive guides covering FastAPI, Docker, development workflow, and API reference.
+
 ## 🚀 What You'll Build
 
 A fully automated deployment pipeline that:

@@ -496,7 +496,7 @@ Establish a secure, well-tested, cloud-agnostic foundation that all other branch
 
 ### GitHub Actions for Main Branch
 
-- [x] Create `.github/workflows/test.yaml`
+- [x] Create `.github/workflows/ci.yaml` (originally test.yaml, renamed for consistency)
   - [x] Trigger on push/PR to main branch
   - [x] Set up Python 3.12 with pip caching
   - [x] Install requirements.txt and requirements-dev.txt
@@ -643,7 +643,7 @@ Create production-ready Google Cloud Run deployment with comprehensive tutorials
 
 ### Production CI/CD Workflow
 
-- [x] Create `.github/workflows/deploy.yaml`
+- [x] Create `.github/workflows/cd.yaml` (originally deploy.yaml, renamed for consistency)
   - [x] Name: "Deploy to Google Cloud Run"
   - [x] Environment variables (PROJECT_ID, REGION, SERVICE_NAME, etc.)
   - [x] Trigger on push to gcloud branch
@@ -1187,7 +1187,7 @@ Create a learning-focused branch with TODO markers and guided exercises for stud
     echo "TODO: Complete this script following tutorial 05"
     ```
 
-- [ ] Modify `.github/workflows/deploy.yaml`
+- [ ] Modify `.github/workflows/cd.yaml`
   - [ ] Keep workflow structure
   - [ ] Add TODO markers for each step
   - [ ] Comment out actual implementation
@@ -1438,7 +1438,7 @@ az containerapp create \
 
 ### Production CI/CD Workflow
 
-- [ ] Create `.github/workflows/deploy.yaml`
+- [ ] Create `.github/workflows/cd.yaml`
   - [ ] Name: "Deploy to Azure Container Apps"
   - [ ] Environment variables (SUBSCRIPTION_ID, RESOURCE_GROUP, etc.)
   - [ ] Trigger on push to azure branch
@@ -1511,7 +1511,7 @@ Create learning branch for Azure similar to gcloud-starter.
 
 - [ ] Modify `scripts/setup-azure.sh` with TODOs
 - [ ] Modify `scripts/deploy-manual.sh` with TODOs
-- [ ] Modify `.github/workflows/deploy.yaml` with TODOs
+- [ ] Modify `.github/workflows/cd.yaml` with TODOs
 
 ### Create Learning Aids
 
@@ -1658,7 +1658,7 @@ Update main branch README to tie everything together.
 ✅ pyproject.toml                      - Tool configurations
 ✅ .env.example                        - Environment variable template
 ✅ .gitignore                          - Expanded ignore patterns
-✅ .github/workflows/test.yaml         - Test workflow for main
+✅ .github/workflows/ci.yaml         - Test workflow for main
 ❌ src/smokeTest/                      - DELETED (renamed to api/)
 ```
 
@@ -1672,7 +1672,7 @@ Update main branch README to tie everything together.
 ✅ scripts/setup-gcloud.sh             - GCP setup automation
 ✅ scripts/deploy-manual.sh            - Manual deployment
 ✅ scripts/cleanup.sh                  - Resource cleanup
-✅ .github/workflows/deploy.yaml       - Production CI/CD
+✅ .github/workflows/cd.yaml       - Production CI/CD
 ✅ docs/tutorials/01-overview.md       - What you'll build
 ✅ docs/tutorials/02-prerequisites.md  - Required tools
 ✅ docs/tutorials/03-local-setup.md    - Dev Container setup
