@@ -1,14 +1,16 @@
 # Development Guide
 
-## Quick Start with Docker Compose (Recommended)
+Fast, efficient local development with Docker and live code reloading.
 
-### Development Mode with Live Reload
+## Quick Start (Recommended)
+
+### Start Development Server
 
 ```bash
-# Start development server with live code reloading
+# Start with live reload
 docker-compose -f docker-compose.dev.yaml up
 
-# Or run in background
+# Run in background
 docker-compose -f docker-compose.dev.yaml up -d
 
 # View logs
@@ -18,191 +20,126 @@ docker-compose -f docker-compose.dev.yaml logs -f
 docker-compose -f docker-compose.dev.yaml down
 ```
 
-**How it works:**
-- Your local `./src` directory is mounted into the container
-- When you edit files, changes appear instantly
-- Uvicorn detects changes and auto-reloads
+**What happens:**
+- Local `./src` mounted into container
+- Edit files → changes appear instantly
+- Uvicorn auto-reloads on changes
 - No rebuild needed!
 
-### Production Mode
+### Test Live Reload
 
-```bash
-# Start production server
-docker-compose up
+1. Start dev server (command above)
+2. Edit `src/api/hello.py` - change the message
+3. Watch logs - you'll see "Reloading..."
+4. Test: `curl http://localhost:8080/api/hello`
 
-# Or run in background
-docker-compose up -d
-
-# Stop
-docker-compose down
-```
-
-## Manual Docker Commands
-
-### Development (with volume mount)
-
-```bash
-# Build once
-docker build -f Dockerfile.dev -t fastapi-dev .
-
-# Run with volume mount for live editing
-docker run -d \
-  -p 8080:8080 \
-  -v $(pwd)/src:/code/src \
-  -e DEBUG=true \
-  --name fastapi-dev \
-  fastapi-dev
-
-# View logs
-docker logs -f fastapi-dev
-
-# Stop and remove
-docker stop fastapi-dev && docker rm fastapi-dev
-```
-
-### Production (no volume mount)
-
-```bash
-# Build
-docker build -f Dockerfile.prod -t fastapi-prod .
-
-# Run
-docker run -d \
-  -p 8080:8080 \
-  -e DEBUG=false \
-  -e ENVIRONMENT=production \
-  --name fastapi-prod \
-  fastapi-prod
-```
+Changes appear immediately! 🎉
 
 ## Understanding Volume Mounts
 
-### What's Happening?
-
 ```yaml
 volumes:
-  - ./src:/code/src  # Local path : Container path
+  - ./src:/code/src  # Local → Container
 ```
 
-- **Left side** (`./src`): Your local directory on the host machine
-- **Right side** (`/code/src`): Directory inside the container
-- Files are "linked" - changes on either side reflect immediately
+**How it works:**
+- Your local files are "linked" to the container
+- Edit on host → changes reflect in container instantly
+- Container edits → reflect on host (rare, but possible)
 
-### When to Rebuild?
+### When to Rebuild
 
-**You DON'T need to rebuild when:**
+**No rebuild needed:**
 - ✅ Editing Python code in `./src`
 - ✅ Adding new Python files
-- ✅ Changing environment variables
+- ✅ Changing `.env` variables
 
-**You DO need to rebuild when:**
-- ❌ Changing `requirements.txt` (adding/removing packages)
-- ❌ Modifying Dockerfile
+**Rebuild required:**
+- ❌ Modifying `requirements.txt` (dependencies)
+- ❌ Changing Dockerfile
 - ❌ Installing system packages
 
-To rebuild:
 ```bash
+# Rebuild and restart
 docker-compose -f docker-compose.dev.yaml up --build
 ```
 
-## Testing Your Setup
-
-### 1. Start the dev server
-```bash
-docker-compose -f docker-compose.dev.yaml up
-```
-
-### 2. Make a code change
-
-Edit `src/api/hello.py` and change the message:
-
-```python
-@router.get("/hello")
-async def get_hello() -> HelloResponse:
-    return HelloResponse(message="Hello, Docker Volume Mounts!")
-```
-
-### 3. Watch the logs
-
-You should see:
-```
-fastapi-dev | INFO:     Shutting down
-fastapi-dev | INFO:     Waiting for application shutdown.
-fastapi-dev | INFO:     Application shutdown complete.
-fastapi-dev | INFO:     Finished server process [8]
-fastapi-dev | WARNING:  StatReload detected changes in 'src/api/hello.py'. Reloading...
-fastapi-dev | INFO:     Started server process [17]
-fastapi-dev | INFO:     Waiting for application startup.
-fastapi-dev | INFO:     Application startup complete.
-```
-
-### 4. Test the change
-
-```bash
-curl http://localhost:8080/api/hello
-# Should return: {"message": "Hello, Docker Volume Mounts!"}
-```
-
-No rebuild needed! 🎉
-
 ## VS Code Dev Container
 
-Alternatively, use VS Code's Dev Container feature:
+Best IDE integration for container development:
 
 1. Open project in VS Code
 2. Press `F1` → "Dev Containers: Reopen in Container"
-3. Code directly inside the container with full IDE support
-4. Changes are automatically synced
+3. Code inside container with full IntelliSense
+4. Terminal runs inside container
+5. Extensions work as if coding locally
 
-Configuration: `.devcontainer/devcontainer.json`
+**Configuration:** `.devcontainer/devcontainer.json`
 
-## Common Issues
+**Benefits:**
+- Consistent environment for all developers
+- No "works on my machine" issues
+- All tools pre-installed in container
 
-### Permission Issues (Linux)
-
-If you see permission errors, you might need to fix ownership:
+## Running Tests
 
 ```bash
-# Find the container's user ID
-docker-compose -f docker-compose.dev.yaml exec fastapi-dev id
+# Inside dev container
+pytest src/tests/ -v --cov=src
 
-# Change ownership on host (if needed)
-sudo chown -R $USER:$USER ./src
+# Using docker-compose
+docker-compose -f docker-compose.dev.yaml exec app pytest src/tests/ -v
+
+# Run specific test
+pytest src/tests/test_api.py::test_health_check -v
 ```
 
-### Changes Not Detected
+See [Quick Reference](./quick-reference.md) for more testing commands.
 
-1. Check volume is mounted:
-   ```bash
-   docker-compose -f docker-compose.dev.yaml exec fastapi-dev ls -la /code/src
-   ```
+## Troubleshooting
 
-2. Check uvicorn is running with `--reload`:
-   ```bash
-   docker-compose -f docker-compose.dev.yaml exec fastapi-dev ps aux
-   ```
+**Changes not detected?** → Restart: `docker-compose -f docker-compose.dev.yaml restart`
 
-3. Restart the container:
-   ```bash
-   docker-compose -f docker-compose.dev.yaml restart
-   ```
+**Port 8080 in use?** → Find process: `lsof -i :8080` (Mac/Linux) or change port
 
-### Container Won't Start
+**Won't start?** → Check logs: `docker-compose -f docker-compose.dev.yaml logs`
 
-1. Check logs:
-   ```bash
-   docker-compose -f docker-compose.dev.yaml logs
-   ```
+**Permission errors?** → Fix: `sudo chown -R $USER:$USER ./src` (Linux only)
 
-2. Check port conflicts:
-   ```bash
-   lsof -i :8080  # Linux/Mac
-   # If something is using port 8080, stop it or change the port
-   ```
+## Development Workflow
 
-## Tips
+**Daily:** Start → Edit → Save → Test → Commit
+```bash
+docker-compose -f docker-compose.dev.yaml up
+# Edit code, save, test (auto-reload)
+# Run: pytest src/tests/ -v
+# Stop: Ctrl+C
+```
 
-- **Docker Compose** is easier than manual `docker run` commands
-- **Volume mounts** enable fast development iteration
-- **--reload flag** must be enabled for auto-reload to work
-- **Dev Container** provides the best IDE integration experience
+**Adding dependencies:**
+1. Add to `requirements.txt` or `requirements-dev.txt`
+2. Rebuild: `docker-compose -f docker-compose.dev.yaml up --build`
+
+**Creating endpoints:**
+1. Create file in `src/api/` → Define routes → Import in `src/main.py`
+2. Save → Test → Add tests in `src/tests/`
+
+## Pro Tips
+
+- Use Docker Compose (easier than manual commands)
+- Keep dev server running (no restart needed for code changes)
+- Check logs for errors
+- Use Dev Container for best IDE experience
+- Test before committing
+- Small, frequent commits
+
+## Next Steps
+
+- **API Documentation:** See [API Reference](./api-reference.md)
+- **Docker Details:** See [Docker Guide](./docker.md)
+- **Command Reference:** See [Quick Reference](./quick-reference.md)
+- **Deploy to Cloud:** Check cloud-specific branches (gcloud, azure)
+
+---
+
+**Quick Commands:** For a comprehensive command reference, see [Quick Reference](./quick-reference.md)
