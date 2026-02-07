@@ -1,4 +1,4 @@
-name: CD
+name: CICD
 
 # Continuous Deployment: Automatically builds, tests, and deploys your FastAPI application
 # to Google Cloud Run whenever you push to the gcloud branch.
