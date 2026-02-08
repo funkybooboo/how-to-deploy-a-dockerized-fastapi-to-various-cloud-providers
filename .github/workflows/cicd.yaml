@@ -1,4 +1,4 @@
-name: Deploy to Azure Container Apps
+name: CICD
 
 env:
   AZURE_CONTAINER_APP: fastapi-app
@@ -8,11 +8,43 @@ env:
 
 on:
   push:
-    branches: [ azure ]
+    branches: [ main, azure ]
   pull_request:
-    branches: [ azure ]
+    branches: [ main, azure ]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run linting
+        run: ruff check src/
+
+      - name: Run type checking
+        run: mypy src/
+        continue-on-error: true  # Don't fail on mypy errors initially
+
+      - name: Run tests
+        run: pytest src/tests/ -v --cov=src --cov-report=term-missing
+
+      - name: Check code formatting
+        run: black --check src/
+        continue-on-error: true  # Don't fail on formatting initially
+
   deploy:
     runs-on: ubuntu-latest
 
