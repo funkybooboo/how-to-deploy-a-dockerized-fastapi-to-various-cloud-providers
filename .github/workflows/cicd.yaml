@@ -1,19 +1,38 @@
 name: CICD
 
+# Continuous Deployment: Automatically builds, tests, and deploys your FastAPI application
+# to Azure Container Apps whenever you push to the azure branch.
+#
+# Required GitHub Secrets:
+#   - AZURE_CREDENTIALS: A JSON object with credentials for a service principal.
+#
+# Setup Instructions:
+#   1. Create a service principal with required permissions (see docs/tutorials/06-cicd-setup.md)
+#   2. Add the JSON credentials as a secret to your GitHub repository.
+
+# Environment variables for easy configuration
 env:
   AZURE_CONTAINER_APP: fastapi-app
   AZURE_RESOURCE_GROUP: fastapi-rg
   ACR_NAME: fastapiregistry
   AZURE_LOCATION: eastus
+  IMAGE_NAME: fastapi
 
 on:
+  pull_request: 
+    branches: [ main ]
   push:
     branches: [ main, azure ]
-  pull_request:
-    branches: [ main, azure ]
+    paths-ignore:
+      - 'docs/**'
+      - 'scripts/**'
+      - '*.md'
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
+  # Run tests before deploying
   test:
+    name: Run Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -36,21 +55,35 @@ jobs:
 
       - name: Run type checking
         run: mypy src/
-        continue-on-error: true  # Don't fail on mypy errors initially
+        continue-on-error: true  # Don't fail on mypy errors
 
       - name: Run tests
         run: pytest src/tests/ -v --cov=src --cov-report=term-missing
 
       - name: Check code formatting
         run: black --check src/
-        continue-on-error: true  # Don't fail on formatting initially
+        continue-on-error: true  # Don't fail on formatting
 
+  # Build and deploy to Azure Container Apps
   deploy:
+    name: Build and Deploy to Azure
+    needs: test  # Only deploy if tests pass
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'  # Only deploy on push, not on PR
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate AZURE_CREDENTIALS
+        run: |
+          if [ -z "${{ secrets.AZURE_CREDENTIALS }}" ]; then
+            echo "🛑 Error: AZURE_CREDENTIALS secret is not set."
+            echo "Please add the AZURE_CREDENTIALS secret to your GitHub repository."
+            echo "See docs/tutorials/06-cicd-setup.md for instructions."
+            exit 1
+          fi
+          echo "✅ AZURE_CREDENTIALS is set."
 
       - name: Azure Login
         uses: azure/login@v1
@@ -63,8 +96,13 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -f Dockerfile.prod -t ${{ env.ACR_NAME }}.azurecr.io/fastapi:latest .
-          docker push ${{ env.ACR_NAME }}.azurecr.io/fastapi:latest
+          docker build -f Dockerfile.prod \
+            -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest \
+            .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+
 
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
@@ -72,5 +110,42 @@ jobs:
           acrName: ${{ env.ACR_NAME }}
           containerAppName: ${{ env.AZURE_CONTAINER_APP }}
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/fastapi:latest
+          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           targetPort: 8080
+
+      - name: Get Service URL
+        id: url
+        run: |
+          APP_URL=$(az containerapp show --name ${{ env.AZURE_CONTAINER_APP }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
+          echo "url=https://$APP_URL" >> $GITHUB_OUTPUT
+          echo "Service URL: https://$APP_URL"
+
+      - name: Verify Deployment
+        run: |
+          sleep 10  # Wait for service to be fully ready
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.url }}/")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Deployment successful! Service is responding."
+          else
+            echo "⚠️  Service returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Deployment Summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Deployment Complete!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "🌐 Service URL: ${{ steps.url.outputs.url }}"
+          echo ""
+          echo "📍 Test Endpoints:"
+          echo "   Health:  ${{ steps.url.outputs.url }}/api/health"
+          echo "   Hello:   ${{ steps.url.outputs.url }}/api/hello"
+          echo "   Docs:    ${{ steps.url.outputs.url }}/api/docs"
+          echo ""
+          echo "📊 View Logs:"
+          echo "   az containerapp logs stream --name ${{ env.AZURE_CONTAINER_APP }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }}"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
