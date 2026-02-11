@@ -20,7 +20,7 @@ async def get_hello() -> HelloResponse:
     Returns:
         HelloResponse: A greeting message
     """
-    return HelloResponse(message="Hello, World!!!")
+    return HelloResponse(message="Hello, World!")
 
 
 @router.get("/hello/{name}", response_model=HelloResponse)
